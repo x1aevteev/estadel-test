@@ -87,7 +87,15 @@
         <div class="journal-header">
           <div>
             <h2 id="journal-title">Журнал событий</h2>
-            <p class="journal-description">Сначала новые · Время МСК</p>
+            <div class="journal-meta">
+              <p class="journal-description"><span class="journal-order"><span id="journal-order">Сначала новые</span> · </span>Время МСК</p>
+              <button class="time-sort mobile-time-sort" id="sort-time-mobile" type="button" aria-label="Сначала новые. Изменить порядок сортировки по времени">
+                <span id="mobile-order">Сначала новые</span>
+                <svg class="sort-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="filters" role="group" aria-label="Фильтр по статусу">
             <button type="button" data-filter="all" aria-pressed="true">Все</button>
@@ -119,7 +127,15 @@
             </colgroup>
             <thead role="rowgroup">
               <tr role="row">
-                <th scope="col" role="columnheader">Время</th>
+                <th class="time-header" id="time-header" scope="col" role="columnheader" aria-sort="descending">
+                  <span class="time-header-label">Время</span>
+                  <button class="time-sort desktop-time-sort" id="sort-time-desktop" type="button" title="Изменить порядок сортировки">
+                    Время
+                    <svg class="sort-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M8 3v10m-3.5-3.5L8 13l3.5-3.5"/>
+                    </svg>
+                  </button>
+                </th>
                 <th scope="col" role="columnheader">Источник</th>
                 <th scope="col" role="columnheader">Тип события</th>
                 <th scope="col" role="columnheader">Статус</th>

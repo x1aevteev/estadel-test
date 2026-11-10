@@ -13,6 +13,8 @@ const byId = (id) => document.getElementById(id);
 const refreshButton = byId("refresh");
 const retryButton = byId("retry");
 const filters = document.querySelectorAll("[data-filter]");
+const desktopSort = byId("sort-time-desktop");
+const mobileSort = byId("sort-time-mobile");
 const table = byId("event-table");
 const rows = byId("event-rows");
 const rowTemplate = byId("event-row");
@@ -24,6 +26,7 @@ const dialog = byId("detail-dialog");
 
 let events = null;
 let activeFilter = "all";
+let timeOrder = "descending";
 let pendingRequest = null;
 let manualRefreshPending = false;
 let detailOpener = null;
@@ -73,9 +76,9 @@ function renderRows(visible) {
 }
 
 function renderJournal() {
-  const visible = activeFilter === "all"
-    ? events
-    : events.filter((event) => event.status === activeFilter);
+  const visible = events.filter((event) => activeFilter === "all" || event.status === activeFilter);
+  const direction = timeOrder === "ascending" ? 1 : -1;
+  visible.sort((first, second) => direction * (Date.parse(first.created_at) - Date.parse(second.created_at)));
 
   renderRows(visible);
   table.hidden = visible.length === 0;
@@ -88,6 +91,18 @@ function renderJournal() {
 
   byId("visible-count").textContent = `Показано ${visible.length} из ${events.length}`;
   byId("journal-footer").hidden = false;
+}
+
+function toggleTimeOrder() {
+  timeOrder = timeOrder === "descending" ? "ascending" : "descending";
+  const label = timeOrder === "ascending" ? "Сначала старые" : "Сначала новые";
+  byId("time-header").setAttribute("aria-sort", timeOrder);
+  byId("journal-order").textContent = label;
+  byId("mobile-order").textContent = label;
+  mobileSort.dataset.order = timeOrder;
+  mobileSort.setAttribute("aria-label", `${label}. Изменить порядок сортировки по времени`);
+  if (events !== null) renderJournal();
+  announcer.textContent = `${label} события.`;
 }
 
 function updateMetrics() {
@@ -233,6 +248,8 @@ dialog.addEventListener("close", () => {
 
 refreshButton.addEventListener("click", refreshManually);
 retryButton.addEventListener("click", refreshManually);
+desktopSort.addEventListener("click", toggleTimeOrder);
+mobileSort.addEventListener("click", toggleTimeOrder);
 document.addEventListener("visibilitychange", pollEvents);
 window.setInterval(pollEvents, refreshInterval);
 void loadEvents();

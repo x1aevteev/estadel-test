@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  scrollbar-gutter: stable;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   color: #19243c;
@@ -186,6 +187,21 @@ h1 {
 }
 h2 { font-size: 1.21rem; line-height: 1.25; letter-spacing: -.025em; }
 .journal-description { margin-top: 4px; font-size: .8rem; }
+.time-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-weight: 720;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.time-sort:hover { background: var(--accent-tint); }
+.time-sort:active { background: #dce5ff; }
+.time-sort .sort-arrow { width: 14px; height: 14px; }
+.time-header[aria-sort="ascending"] .sort-arrow,
+.mobile-time-sort[data-order="ascending"] .sort-arrow { transform: rotate(180deg); }
+.time-header-label, .mobile-time-sort { display: none; }
 
 .filters {
   display: inline-flex;
@@ -284,6 +300,15 @@ h2 { font-size: 1.21rem; line-height: 1.25; letter-spacing: -.025em; }
 .event-table th { color: var(--muted); font-size: .74rem; font-weight: 720; }
 .event-table td { font-size: .84rem; line-height: 1.43; }
 .event-table th:first-child, .event-table td:first-child { padding-left: 20px; }
+.event-table th.time-header { padding: 0; }
+.desktop-time-sort {
+  width: 100%;
+  min-height: 35px;
+  padding: 0 10px 0 20px;
+  border: 0;
+  background: transparent;
+}
+.desktop-time-sort:focus-visible { outline-offset: -3px; }
 .event-table tbody tr {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -378,8 +403,28 @@ h2 { font-size: 1.21rem; line-height: 1.25; letter-spacing: -.025em; }
   background: #fff;
   color: var(--ink);
   box-shadow: -16px 0 50px #101f4233;
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    opacity 210ms ease,
+    transform 240ms cubic-bezier(.2, .75, .25, 1),
+    display 240ms allow-discrete,
+    overlay 240ms allow-discrete;
 }
-.detail-drawer::backdrop { background: #13213d66; }
+.detail-drawer[open] { opacity: 1; transform: translateX(0); }
+.detail-drawer::backdrop {
+  background: #13213d66;
+  opacity: 0;
+  transition:
+    opacity 240ms ease,
+    display 240ms allow-discrete,
+    overlay 240ms allow-discrete;
+}
+.detail-drawer[open]::backdrop { opacity: 1; }
+@starting-style {
+  .detail-drawer[open] { opacity: 0; transform: translateX(24px); }
+  .detail-drawer[open]::backdrop { opacity: 0; }
+}
 body:has(.detail-drawer[open]) { overflow: hidden; }
 .detail-header {
   position: sticky;
@@ -430,6 +475,19 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
   .shell { width: min(100% - 36px, 1200px); }
   .main-content { padding-block: 31px 36px; }
   .metric { padding-left: 14px; }
+  .journal-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+  .journal-meta .journal-description { margin-top: 0; }
+  .journal-order, .desktop-time-sort { display: none; }
+  .time-header-label { display: inline; }
+  .mobile-time-sort {
+    display: inline-flex;
+    min-height: 44px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    font-size: .78rem;
+  }
   .event-table { display: block; position: relative; }
   .event-table colgroup { display: none; }
   .event-table thead {
@@ -472,11 +530,17 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
   .brand-caption { display: none; }
   .main-content { padding-block: 25px 30px; }
   .page-heading { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-  .metrics { gap: 7px; margin-bottom: 17px; }
-  .metric { gap: 6px; padding: 10px 9px; min-height: 108px; }
-  .metric-icon { position: static; width: 29px; height: 29px; border-radius: 8px; }
+  .metrics { grid-template-columns: minmax(0, 1fr); gap: 7px; margin-bottom: 17px; }
+  .metric {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 13px;
+    min-height: 52px;
+  }
+  .metric-icon { position: static; flex: none; width: 29px; height: 29px; border-radius: 8px; }
   .metric-icon svg { width: 17px; height: 17px; }
-  .metric dt { display: grid; gap: 6px; font-size: .7rem; overflow-wrap: anywhere; }
+  .metric dt { display: flex; align-items: center; gap: 10px; font-size: .82rem; overflow-wrap: anywhere; }
   .metric dd { font-size: 1.45rem; }
   .journal-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px; }
   .filters button { flex: 1; min-height: 44px; padding-inline: 6px; }
@@ -486,4 +550,5 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; }
+  .detail-drawer, .detail-drawer::backdrop { transition: none; }
 }
