@@ -269,7 +269,9 @@ async function includeCreatedEvent(created) {
   if (events === null) return revealEvent;
 
   journalRevision += 1;
-  if (!events.some((event) => event.id === created.id)) events = [created, ...events];
+  const existingIndex = events.findIndex((event) => event.id === created.id);
+  if (existingIndex === -1) events.unshift(created);
+  else events[existingIndex] = created;
   updateMetrics();
   renderJournal();
   return revealEvent;
