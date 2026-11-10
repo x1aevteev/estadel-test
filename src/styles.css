@@ -611,6 +611,24 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
   .journal-footer { padding-inline: 14px; flex-wrap: wrap; }
 }
 
+@media (max-width: 420px) {
+  .heading-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
+    width: 100%;
+  }
+  .heading-actions .primary-button {
+    min-width: 0;
+    padding: 6px 10px;
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal;
+  }
+  .refresh-button { width: 44px; padding: 0; }
+  .refresh-label { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; }
   .detail-drawer, .detail-drawer::backdrop { transition: none; }

@@ -1,98 +1,55 @@
-export const seedEvents = [
-  {
-    id: 'evt-1012',
-    source: 'amoCRM',
-    type: 'lead.created',
-    status: 'success',
-    created_at: '2026-11-02T12:42:00Z',
-    message: 'Тестовая заявка передана в журнал интеграций.',
-  },
-  {
-    id: 'evt-1011',
-    source: 'МойСклад',
-    type: 'stock.updated',
-    status: 'error',
-    created_at: '2026-11-02T12:36:00Z',
-    message: 'Остаток не обновлён. В тестовом сообщении отсутствует код склада.',
-  },
-  {
-    id: 'evt-1010',
-    source: 'Битрикс24',
-    type: 'deal.updated',
-    status: 'success',
-    created_at: '2026-11-02T12:31:00Z',
-    message: 'Изменение статуса тестовой сделки обработано.',
-  },
-  {
-    id: 'evt-1009',
-    source: 'Tilda',
-    type: 'form.submitted',
-    status: 'success',
-    created_at: '2026-11-02T12:25:00Z',
-    message: 'Вебхук от тестовой формы принят.',
-  },
-  {
-    id: 'evt-1008',
-    source: 'amoCRM',
-    type: 'contact.updated',
-    status: 'error',
-    created_at: '2026-11-02T12:19:00Z',
-    message: 'Вебхук отклонён. Тестовый идентификатор контакта не найден.',
-  },
-  {
-    id: 'evt-1007',
-    source: 'МойСклад',
-    type: 'product.updated',
-    status: 'success',
-    created_at: '2026-11-02T12:16:00Z',
-    message: 'Данные тестового товара обновлены.',
-  },
-  {
-    id: 'evt-1006',
-    source: 'Битрикс24',
-    type: 'task.created',
-    status: 'success',
-    created_at: '2026-11-02T12:10:00Z',
-    message: 'Создание тестовой задачи зарегистрировано.',
-  },
-  {
-    id: 'evt-1005',
-    source: 'Tilda',
-    type: 'form.submitted',
-    status: 'error',
-    created_at: '2026-11-02T12:04:00Z',
-    message: 'Вебхук отклонён. Тестовое сообщение не содержит имени формы.',
-  },
-  {
-    id: 'evt-1004',
-    source: 'amoCRM',
-    type: 'lead.updated',
-    status: 'success',
-    created_at: '2026-11-02T11:57:00Z',
-    message: 'Новый этап тестовой заявки сохранён.',
-  },
-  {
-    id: 'evt-1003',
-    source: 'МойСклад',
-    type: 'order.created',
-    status: 'success',
-    created_at: '2026-11-02T11:53:00Z',
-    message: 'Данные тестового заказа приняты.',
-  },
-  {
-    id: 'evt-1002',
-    source: 'Битрикс24',
-    type: 'deal.created',
-    status: 'error',
-    created_at: '2026-11-02T11:48:00Z',
-    message: 'Тестовая сделка отклонена. Указан неизвестный код валюты.',
-  },
-  {
-    id: 'evt-1001',
-    source: 'Tilda',
-    type: 'form.submitted',
-    status: 'success',
-    created_at: '2026-11-02T11:40:00Z',
-    message: 'Отправка тестовой формы зарегистрирована.',
-  },
-];
+import seedEvents from '../content/seed-events.json' with { type: 'json' };
+
+const ID_PREFIX = 'evt-';
+const STATUSES = ['success', 'error'];
+const TEXT_FIELDS = { source: 80, type: 80, message: 500 };
+
+function validateEvent(input) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return { error: { message: 'Тело запроса должно быть JSON-объектом.' } };
+  }
+
+  const fields = {};
+  const data = {};
+  for (const [field, limit] of Object.entries(TEXT_FIELDS)) {
+    const value = typeof input[field] === 'string' ? input[field].trim() : '';
+    if (!value || value.length > limit) {
+      fields[field] = `Укажите непустую строку длиной до ${limit} символов.`;
+    } else {
+      data[field] = value;
+    }
+  }
+
+  const status = typeof input.status === 'string' ? input.status.trim() : '';
+  if (!STATUSES.includes(status)) {
+    fields.status = 'Укажите статус success или error.';
+  }
+  if (Object.keys(fields).length > 0) {
+    return { error: { message: 'Проверьте поля события.', fields } };
+  }
+  return { data: { ...data, status } };
+}
+
+export function createEventJournal() {
+  const events = seedEvents.map((event) => ({ ...event }));
+  let nextNumber = Math.max(...events.map(({ id }) => Number(id.slice(ID_PREFIX.length)))) + 1;
+
+  return {
+    list() {
+      return events;
+    },
+    append(input) {
+      const validation = validateEvent(input);
+      if ('error' in validation) return validation;
+
+      const event = {
+        id: `${ID_PREFIX}${nextNumber}`,
+        ...validation.data,
+        created_at: new Date().toISOString(),
+      };
+      events.unshift(event);
+      nextNumber += 1;
+      return { event };
+    },
+  };
+}

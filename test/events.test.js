@@ -153,7 +153,15 @@ test('routing denies unsupported methods and paths outside the allowlist', async
   assert.equal(unsupported.headers.get('allow'), 'GET, POST');
   assert.ok((await unsupported.json()).error.message);
 
-  for (const path of ['/server/app.js', '/%2e%2e%2fserver%2fapp.js', '/does-not-exist']) {
+  for (const path of [
+    '/server/app.js',
+    '/content/seed-events.json',
+    '/package.json',
+    '/assets/%2e%2e%2fserver%2fapp.js',
+    '/assets/index-aaaaaaaa.js.map',
+    '/assets/missing-bbbbbbbb.js',
+    '/does-not-exist',
+  ]) {
     const response = await request(path);
     assert.equal(response.status, 404);
     assert.ok((await response.json()).error.message);
