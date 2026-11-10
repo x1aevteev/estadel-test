@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { seedEvents } from './events.js';
 
 const MAX_BODY_SIZE = 16 * 1024;
+const EVENT_ID_PREFIX = 'evt-';
 const STATUSES = ['success', 'error'];
 const TEXT_FIELDS = { source: 80, type: 80, message: 500 };
 const STATIC_ROUTES = new Map([
@@ -30,7 +30,7 @@ function sendBodyLimitError(response) {
   sendError(response, 413, 'Тело запроса превышает 16 КиБ.');
 }
 
-async function addEvent(request, response, events) {
+async function addEvent(request, response, journal) {
   const mediaType = request.headers['content-type']?.split(';', 1)[0].trim().toLowerCase();
   if (mediaType !== 'application/json') {
     request.resume();
@@ -86,23 +86,24 @@ async function addEvent(request, response, events) {
   }
 
   const event = {
-    id: `evt-${randomUUID()}`,
+    id: `${EVENT_ID_PREFIX}${journal.nextEventNumber}`,
     source: data.source,
     type: data.type,
     status,
     created_at: new Date().toISOString(),
     message: data.message,
   };
-  events.unshift(event);
+  journal.events.unshift(event);
+  journal.nextEventNumber += 1;
   sendJson(response, 201, event);
 }
 
-async function handleRequest(request, response, events) {
+async function handleRequest(request, response, journal) {
   const path = request.url?.split('?', 1)[0];
 
   if (path === '/api/events') {
-    if (request.method === 'GET') return sendJson(response, 200, events);
-    if (request.method === 'POST') return addEvent(request, response, events);
+    if (request.method === 'GET') return sendJson(response, 200, journal.events);
+    if (request.method === 'POST') return addEvent(request, response, journal);
     return sendError(response, 405, 'Метод не поддерживается.', { Allow: 'GET, POST' });
   }
 
@@ -122,11 +123,12 @@ async function handleRequest(request, response, events) {
 }
 
 export function createAppServer() {
-  const events = [...seedEvents];
+  const lastSeedNumber = Math.max(...seedEvents.map(({ id }) => Number(id.slice(EVENT_ID_PREFIX.length))));
+  const journal = { events: [...seedEvents], nextEventNumber: lastSeedNumber + 1 };
 
   return createServer((request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
-    handleRequest(request, response, events).catch(() => {
+    handleRequest(request, response, journal).catch(() => {
       if (response.destroyed || response.writableEnded) return;
       if (response.headersSent) {
         response.destroy();

@@ -45,7 +45,7 @@ test('GET returns 12 unique seeded events in reverse chronological order', async
   }
 });
 
-test('POST normalizes valid fields, assigns metadata, and prepends the event', async (t) => {
+test('POST normalizes valid fields, assigns sequential IDs, and prepends events', async (t) => {
   const request = await startServer(t);
   const original = await (await request()).json();
   const response = await postEvent(request, {
@@ -62,14 +62,21 @@ test('POST normalizes valid fields, assigns metadata, and prepends the event', a
     id: event.id,
     created_at: event.created_at,
   });
-  assert.match(event.id, /^evt-[0-9a-f-]{36}$/);
-  assert.ok(original.every(({ id }) => id !== event.id));
+  assert.equal(event.id, 'evt-1013');
   assert.equal(new Date(event.created_at).toISOString(), event.created_at);
   assert.notEqual(event.created_at, original[0].created_at);
   assert.deepEqual(await (await request()).json(), [event, ...original]);
 
+  const following = await Promise.all([postEvent(request, TEST_EVENT), postEvent(request, TEST_EVENT)]);
+  assert.deepEqual(following.map(({ status }) => status), [201, 201]);
+  const nextEvents = await Promise.all(following.map((created) => created.json()));
+  assert.deepEqual(nextEvents.map(({ id }) => id).sort(), ['evt-1014', 'evt-1015']);
+
   const secondRequest = await startServer(t);
   assert.deepEqual(await (await secondRequest()).json(), original);
+  const independent = await postEvent(secondRequest, TEST_EVENT);
+  assert.equal(independent.status, 201);
+  assert.equal((await independent.json()).id, 'evt-1013');
 });
 
 test('POST identifies invalid fields and preserves the journal', async (t) => {
@@ -94,6 +101,9 @@ test('POST identifies invalid fields and preserves the journal', async (t) => {
   }
 
   assert.deepEqual(await (await request()).json(), original);
+  const accepted = await postEvent(request, TEST_EVENT);
+  assert.equal(accepted.status, 201);
+  assert.equal((await accepted.json()).id, 'evt-1013');
 });
 
 test('POST rejects malformed JSON, non-objects, and unsupported media', async (t) => {
