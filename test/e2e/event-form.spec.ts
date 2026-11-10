@@ -1,7 +1,5 @@
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { expect, test as base, type Locator, type Page, type Response } from '@playwright/test';
-import { createAppServer } from '../../server/app.js';
+import { expect, type Locator, type Page, type Response } from '@playwright/test';
+import { test } from './fixtures';
 
 const eventsPath = '/api/events';
 const formTitle = 'Добавить тестовое событие';
@@ -11,19 +9,6 @@ const draft = {
   status: 'error',
   message: 'В тестовом событии нет номера отправления.',
 };
-
-const test = base.extend<{ appUrl: string }>({
-  appUrl: async ({}, use) => {
-    const server = createAppServer();
-    await once(server.listen(0, '127.0.0.1'), 'listening');
-    const address = server.address() as AddressInfo;
-    try {
-      await use(`http://127.0.0.1:${address.port}`);
-    } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  },
-});
 
 function isCreateResponse(response: Response) {
   return new URL(response.url()).pathname === eventsPath && response.request().method() === 'POST';
@@ -91,7 +76,9 @@ test('sends the form to the API and displays the new event under an initially in
   const row = page.getByRole('row').filter({ hasText: draft.type });
   await expect(row).toContainText(draft.source);
   await expect(row).toContainText(draft.message);
+  await expect(row).toHaveAttribute('data-created', 'true');
   await row.getByRole('button', { name: 'Открыть событие evt-1013' }).click();
+  await expect(page.locator('[data-event-id="evt-1013"]')).toHaveAttribute('data-selected', 'true');
   await expect(page.getByRole('dialog')).toContainText(draft.message);
 });
 

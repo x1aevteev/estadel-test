@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { clock, shortDate, statusLabels, type IntegrationEvent, type StatusFilter, type TimeOrder } from "../events";
 
 const props = defineProps<{
@@ -12,12 +12,16 @@ const props = defineProps<{
   loading: boolean;
   notice: string;
   refreshPending: boolean;
+  creationSuccess: string;
+  createdEventId: string | null;
+  selectedEventId: string | null;
 }>();
 
 const emit = defineEmits<{
   filter: [filter: StatusFilter];
   sort: [];
   retry: [];
+  create: [opener: HTMLButtonElement];
   focusRefresh: [];
   details: [event: IntegrationEvent, opener: HTMLButtonElement];
 }>();
@@ -26,27 +30,14 @@ const filters = { all: "Все", ...statusLabels } as const;
 const filterGroup = ref<HTMLDivElement | null>(null);
 const retry = ref<HTMLButtonElement | null>(null);
 
-const listState = computed(() => {
-  if (props.loading) return {
-    title: "Загружаем события",
-    description: "Получаем данные журнала.",
-  };
-  if (props.total === null) return {
-    title: "Журнал недоступен",
-    description: "Повторите запрос, чтобы загрузить события.",
-  };
-  if (props.total === 0) return {
-    title: "Событий пока нет",
-    description: "Новые записи появятся здесь после получения вебхука.",
-  };
-  return {
-    title: "Нет событий с этим статусом",
-    description: "Выберите другой статус, чтобы увидеть записи.",
-  };
-});
-
 function focusActiveFilter() {
   filterGroup.value?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+}
+
+async function resetFilter() {
+  emit("filter", "all");
+  await nextTick();
+  focusActiveFilter();
 }
 
 function openFromRow(event: IntegrationEvent, click: MouseEvent) {
@@ -66,10 +57,12 @@ defineExpose({ focusActiveFilter });
 <template>
   <section class="journal" aria-labelledby="journal-title">
     <div class="journal-header">
-      <div>
+      <div class="journal-heading">
         <h2 id="journal-title">Журнал событий</h2>
         <div class="journal-meta">
-          <p class="journal-description"><span class="journal-order"><span id="journal-order">{{ orderLabel }}</span> · </span>Время МСК</p>
+          <p class="journal-description">
+            <span class="journal-order"><span id="journal-order">{{ orderLabel }}</span> · </span><span class="journal-time-label">Время </span>МСК
+          </p>
           <button
             class="time-sort mobile-time-sort"
             id="sort-time-mobile"
@@ -99,8 +92,11 @@ defineExpose({ focusActiveFilter });
       </div>
     </div>
 
-    <div class="notice" id="notice" :hidden="!notice">
-      <div role="alert" id="notice-text">{{ notice }}</div>
+    <div class="notice" id="notice" :class="{ 'notice-initial': total === null }" :hidden="!notice">
+      <div role="alert">
+        <h3 v-if="notice && total === null" class="state-title" id="state-title">Журнал недоступен</h3>
+        <p id="notice-text">{{ notice }}</p>
+      </div>
       <button
         ref="retry"
         class="button retry-button"
@@ -111,11 +107,36 @@ defineExpose({ focusActiveFilter });
       >Повторить</button>
     </div>
 
+    <div role="status">
+      <p class="creation-success" id="creation-success" :hidden="!creationSuccess">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5"/>
+          <path d="m8.5 12 2.3 2.5 4.7-5"/>
+        </svg>
+        {{ creationSuccess }}
+      </p>
+    </div>
+
     <div class="list-area" id="list-area" :aria-busy="loading">
-      <div class="list-state" id="list-state" :hidden="events.length > 0">
-        <div class="state-symbol" aria-hidden="true"><span v-if="loading" class="state-loader"></span></div>
-        <p class="state-title" id="state-title">{{ listState.title }}</p>
-        <p class="state-description" id="state-description">{{ listState.description }}</p>
+      <div v-if="loading" class="journal-loading" id="list-state">
+        <p class="sr-only" id="state-title">Загружаем события</p>
+        <div v-for="row in 4" :key="row" class="skeleton-row" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div v-else-if="total !== null && events.length === 0" class="list-state" id="list-state">
+        <h3 class="state-title" id="state-title">{{ total === 0 ? "Событий пока нет" : "Нет событий с этим статусом" }}</h3>
+        <p class="state-description" id="state-description">
+          {{ total === 0 ? "Добавьте тестовую запись или дождитесь первого вебхука." : "Сбросьте фильтр, чтобы увидеть все записи." }}
+        </p>
+        <button
+          v-if="total === 0"
+          class="button"
+          type="button"
+          aria-haspopup="dialog"
+          @click="emit('create', $event.currentTarget as HTMLButtonElement)"
+        >Добавить тестовое событие</button>
+        <button v-else class="button" type="button" @click="resetFilter">Сбросить фильтр</button>
       </div>
 
       <table class="event-table" id="event-table" role="table" aria-labelledby="journal-title" :hidden="events.length === 0">
@@ -146,7 +167,15 @@ defineExpose({ focusActiveFilter });
           </tr>
         </thead>
         <tbody id="event-rows" role="rowgroup">
-          <tr v-for="event in events" :key="event.id" role="row" :data-event-id="event.id" @click="openFromRow(event, $event)">
+          <tr
+            v-for="event in events"
+            :key="event.id"
+            role="row"
+            :data-event-id="event.id"
+            :data-created="event.id === createdEventId || undefined"
+            :data-selected="event.id === selectedEventId || undefined"
+            @click="openFromRow(event, $event)"
+          >
             <td role="cell">
               <time class="event-time" :datetime="event.created_at">
                 <span>{{ clock.format(Date.parse(event.created_at)) }}</span>
@@ -162,7 +191,9 @@ defineExpose({ focusActiveFilter });
                 class="icon-button row-action"
                 type="button"
                 title="Открыть детали"
+                aria-haspopup="dialog"
                 :aria-label="`Открыть событие ${event.id}`"
+                :aria-describedby="event.id === createdEventId ? 'creation-success' : undefined"
                 @click.stop="emit('details', event, $event.currentTarget as HTMLButtonElement)"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

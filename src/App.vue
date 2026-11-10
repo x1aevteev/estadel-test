@@ -15,12 +15,15 @@ const updatedAt = ref("");
 const manualRefreshPending = ref(false);
 const announcer = ref("");
 const creationSuccess = ref("");
+const createdEvent = shallowRef<IntegrationEvent | null>(null);
+const selectedEvent = shallowRef<IntegrationEvent | null>(null);
 
 const addEventButton = ref<HTMLButtonElement | null>(null);
 const refreshButton = ref<HTMLButtonElement | null>(null);
 const journal = ref<InstanceType<typeof EventJournal> | null>(null);
 const entry = ref<InstanceType<typeof EventEntry> | null>(null);
 const details = ref<InstanceType<typeof EventDetails> | null>(null);
+let entryOpener: HTMLButtonElement | null = null;
 let detailOpener: HTMLButtonElement | null = null;
 let pendingRequest: Promise<boolean> | null = null;
 let journalRevision = 0;
@@ -35,6 +38,8 @@ const visibleEvents = computed(() => {
   return visible.sort((first, second) => direction * (Date.parse(first.created_at) - Date.parse(second.created_at)));
 });
 const visibleCount = computed(() => total.value === null ? "" : `Показано ${visibleEvents.value.length} из ${total.value}`);
+const createdEventId = computed(() => resolveEventId(createdEvent.value));
+const selectedEventId = computed(() => resolveEventId(selectedEvent.value));
 const orderLabel = computed(() => timeOrder.value === "ascending" ? "Сначала старые" : "Сначала новые");
 const syncLabel = computed(() => ({
   loading: "Подключение",
@@ -47,6 +52,12 @@ const notice = computed(() => {
     ? "Не удалось получить события."
     : "Не удалось обновить журнал. Показаны последние полученные данные.";
 });
+
+function resolveEventId(record: IntegrationEvent | null) {
+  return record && snapshot.value?.some((event) => event.id === record.id && event.created_at === record.created_at)
+    ? record.id
+    : null;
+}
 
 async function requestEvents() {
   const revision = journalRevision;
@@ -119,6 +130,7 @@ function mergeCreatedEvent(created: IntegrationEvent) {
 }
 
 function includeCreatedEvent(created: IntegrationEvent) {
+  createdEvent.value = created;
   const revealEvent = activeFilter.value !== "all" && activeFilter.value !== created.status;
   if (revealEvent) activeFilter.value = "all";
 
@@ -128,9 +140,17 @@ function includeCreatedEvent(created: IntegrationEvent) {
   return revealEvent;
 }
 
-function openEntry() {
+function openEntry(opener = addEventButton.value) {
+  entryOpener = opener;
   creationSuccess.value = "";
+  createdEvent.value = null;
   void entry.value?.open();
+}
+
+function restoreEntryFocus() {
+  if (entryOpener?.isConnected) entryOpener.focus();
+  else addEventButton.value?.focus();
+  entryOpener = null;
 }
 
 function announceCreation(switchedFilter: boolean) {
@@ -141,12 +161,14 @@ function announceCreation(switchedFilter: boolean) {
 
 function openDetails(event: IntegrationEvent, opener: HTMLButtonElement) {
   detailOpener = opener;
+  selectedEvent.value = event;
   void details.value?.open(event);
 }
 
 function restoreDetailFocus() {
-  if (detailOpener?.isConnected) detailOpener.focus();
+  if (selectedEventId.value && detailOpener?.isConnected) detailOpener.focus();
   else journal.value?.focusActiveFilter();
+  selectedEvent.value = null;
   detailOpener = null;
 }
 
@@ -172,7 +194,7 @@ onUnmounted(() => {
           </svg>
         </span>
         <span class="brand-name">ESTADEL</span>
-        <span class="brand-caption">Панель мониторинга</span>
+        <span class="brand-caption">Журнал вебхуков</span>
       </div>
       <p class="sync-state" id="sync-state" :data-state="syncState">
         <span class="sync-dot" aria-hidden="true"></span>
@@ -184,12 +206,11 @@ onUnmounted(() => {
   <main class="shell main-content">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Операционный журнал</p>
         <h1>Мониторинг интеграций</h1>
-        <p class="page-description">Отслеживайте вебхуки, их результаты и причины ошибок.</p>
+        <p class="page-description">Статусы вебхуков и причины сбоев</p>
       </div>
       <div class="heading-actions">
-        <button ref="addEventButton" class="button primary-button" id="add-event" type="button" aria-haspopup="dialog" @click="openEntry">
+        <button ref="addEventButton" class="button primary-button" id="add-event" type="button" aria-haspopup="dialog" @click="openEntry()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14"/>
           </svg>
@@ -212,8 +233,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div role="status"><p class="creation-success" id="creation-success" :hidden="!creationSuccess">{{ creationSuccess }}</p></div>
-
     <EventStats :total="total" :successful="successful" :failed="failed" />
     <EventJournal
       ref="journal"
@@ -226,15 +245,19 @@ onUnmounted(() => {
       :loading="syncState === 'loading'"
       :notice="notice"
       :refresh-pending="manualRefreshPending"
+      :creation-success="creationSuccess"
+      :created-event-id="createdEventId"
+      :selected-event-id="selectedEventId"
       @filter="setFilter"
       @sort="toggleTimeOrder"
       @retry="refreshManually"
+      @create="openEntry"
       @focus-refresh="refreshButton?.focus()"
       @details="openDetails"
     />
     <p class="sr-only" id="announcer" role="status">{{ announcer }}</p>
   </main>
 
-  <EventEntry ref="entry" :include-event="includeCreatedEvent" @saved="announceCreation" @close="addEventButton?.focus()" />
+  <EventEntry ref="entry" :include-event="includeCreatedEvent" @saved="announceCreation" @close="restoreEntryFocus" />
   <EventDetails ref="details" @close="restoreDetailFocus" />
 </template>

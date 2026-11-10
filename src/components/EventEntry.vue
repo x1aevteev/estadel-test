@@ -172,10 +172,7 @@ defineExpose({ open });
     <div class="entry-layout">
       <div class="entry-top">
         <div class="detail-header">
-          <div>
-            <p class="eyebrow">Новая запись</p>
-            <h2 id="add-event-title">Добавить тестовое событие</h2>
-          </div>
+          <h2 id="add-event-title">Добавить тестовое событие</h2>
           <button
             class="icon-button close-button"
             id="close-add-event"
