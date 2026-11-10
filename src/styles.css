@@ -629,6 +629,13 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
   .refresh-label { display: none; }
 }
 
+@media (max-width: 360px) {
+  .detail-fields div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; }
   .detail-drawer, .detail-drawer::backdrop { transition: none; }
