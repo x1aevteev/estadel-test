@@ -29,15 +29,15 @@ function isCreateResponse(response: Response) {
   return new URL(response.url()).pathname === eventsPath && response.request().method() === 'POST';
 }
 
-async function fillForm(form: Locator, source = draft.source) {
-  await form.getByLabel('Источник').fill(source);
+async function fillForm(form: Locator) {
+  await form.getByLabel('Источник').fill(draft.source);
   await form.getByLabel('Тип события').fill(draft.type);
   await form.getByLabel('Статус').selectOption(draft.status);
   await form.getByLabel('Причина ошибки').fill(draft.message);
 }
 
-async function expectDraft(form: Locator, source = draft.source) {
-  await expect(form.getByLabel('Источник')).toHaveValue(source);
+async function expectDraft(form: Locator) {
+  await expect(form.getByLabel('Источник')).toHaveValue(draft.source);
   await expect(form.getByLabel('Тип события')).toHaveValue(draft.type);
   await expect(form.getByLabel('Статус')).toHaveValue(draft.status);
   await expect(form.getByLabel('Причина ошибки')).toHaveValue(draft.message);
@@ -77,7 +77,8 @@ test('sends the form to the API and displays the new event under an initially in
   await expect(page.getByRole('dialog')).toContainText(draft.message);
 });
 
-test('requires fields in the browser and retains the draft after real API validation', async ({ appUrl, page }) => {
+test('marks missing fields and resets the dismissal timer on a repeated attempt', async ({ page }) => {
+  await page.clock.install();
   let submissions = 0;
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === eventsPath && request.method() === 'POST') {
@@ -89,26 +90,68 @@ test('requires fields in the browser and retains the draft after real API valida
   const form = page.getByRole('dialog', { name: formTitle });
   const submit = form.getByRole('button', { name: 'Добавить событие' });
   const source = form.getByLabel('Источник');
-  await submit.click();
-  expect(await source.evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
-  await expect(source).toBeFocused();
-  expect(submissions).toBe(0);
+  const type = form.getByLabel('Тип события');
+  const description = form.getByLabel('Описание');
+  const notice = form.getByText('Заполните все обязательные поля', { exact: true });
+  const markers = form.locator('.required-marker');
+  await expect(markers).toHaveCount(4);
+  await expect(markers.first()).toBeVisible();
+  await source.fill('   ');
 
-  await fillForm(form, '   ');
+  await submit.click();
+  await expect(notice).toBeVisible();
+  await expect(source).toBeFocused();
+  for (const field of [source, type, description]) {
+    await expect(field).toHaveAttribute('aria-invalid', 'true');
+  }
+  await expect(form.getByLabel('Статус')).not.toHaveAttribute('aria-invalid', 'true');
+
+  await source.fill(draft.source);
+  await expect(source).not.toHaveAttribute('aria-invalid', 'true');
+  await page.clock.runFor(2_500);
+  await submit.click();
+  await expect(type).toBeFocused();
+  await page.clock.runFor(3_000);
+  await expect(notice).toBeVisible();
+  await page.clock.runFor(2_500);
+  await expect(notice).toBeHidden();
+  await expect(type).toHaveAttribute('aria-invalid', 'true');
+  await expect(source).toHaveValue(draft.source);
+  expect(submissions).toBe(0);
+});
+
+test('retains the draft after real API validation', async ({ appUrl, page }) => {
+  let rejectNextPost = true;
+  await page.route(`**${eventsPath}`, async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && rejectNextPost) {
+      rejectNextPost = false;
+      await route.continue({ postData: { ...request.postDataJSON(), source: '' } });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByRole('button', { name: formTitle }).click();
+  const form = page.getByRole('dialog', { name: formTitle });
+  const submit = form.getByRole('button', { name: 'Добавить событие' });
+  const source = form.getByLabel('Источник');
+  await fillForm(form);
+
   const responsePromise = page.waitForResponse(isCreateResponse);
   await submit.click();
   const response = await responsePromise;
   expect(response.status()).toBe(400);
   const { error } = await response.json();
-  await expect(form.getByRole('alert')).toContainText(error.message);
+  await expect(form.getByRole('alert').filter({ hasText: error.message })).toBeVisible();
   await expect(form.locator('#source-error')).toHaveText(error.fields.source);
   await expect(source).toHaveAttribute('aria-invalid', 'true');
   await expect(source).toBeFocused();
-  await expectDraft(form, '   ');
+  await expectDraft(form);
   const journal = await page.request.get(`${appUrl}${eventsPath}`);
   expect(await journal.json()).toHaveLength(12);
 
-  await source.fill(draft.source);
+  await source.fill('Повторная доставка');
   await expect(source).not.toHaveAttribute('aria-invalid', 'true');
   await submit.click();
   await expect(form).toBeHidden();
@@ -131,7 +174,7 @@ test('keeps the draft and permits retry after a server failure', async ({ page }
   await fillForm(form);
   const submit = form.getByRole('button', { name: 'Добавить событие' });
   await submit.click();
-  await expect(form.getByRole('alert')).toContainText('Не удалось');
+  await expect(form.getByRole('alert').filter({ hasText: 'Не удалось' })).toBeVisible();
   await expectDraft(form);
   await expect(page.locator('#count-total')).toHaveText('12');
 

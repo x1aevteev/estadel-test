@@ -494,8 +494,49 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
 .detail-message h3 { margin-bottom: 6px; font-size: .9rem; }
 .detail-message p { color: #3c4a63; font-size: .9rem; line-height: 1.56; overflow-wrap: anywhere; white-space: pre-wrap; }
 
-#add-event-dialog { scroll-padding-block: 116px 16px; }
-.entry-form { padding: 20px 24px 24px; }
+#add-event-dialog { overflow: clip; }
+.entry-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+.entry-top .detail-header { position: static; }
+.entry-form {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+  padding: 20px 24px 24px;
+}
+.entry-required-notice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  margin: 11px 24px 0;
+  padding: 10px 12px 13px;
+  border: 1px solid #f0cbd3;
+  border-radius: 9px;
+  background: var(--error-tint);
+  color: var(--error);
+  font-size: .84rem;
+  font-weight: 690;
+  line-height: 1.35;
+}
+.entry-required-notice svg { width: 18px; height: 18px; }
+.entry-notice-track {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: #f0cbd3;
+}
+.entry-notice-countdown {
+  height: 100%;
+  background: currentColor;
+  transform-origin: left;
+  animation: entry-notice-countdown var(--notice-duration) linear forwards;
+}
+@keyframes entry-notice-countdown { to { transform: scaleX(0); } }
 .entry-hint { color: var(--muted); font-size: .84rem; line-height: 1.45; }
 .entry-fields {
   display: grid;
@@ -507,6 +548,7 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
 }
 .entry-field { display: grid; gap: 5px; }
 .entry-field label { font-size: .85rem; font-weight: 670; }
+.required-marker { color: var(--error); }
 .entry-field :is(input, select, textarea) {
   width: 100%;
   min-width: 0;
@@ -533,6 +575,10 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
 }
 .entry-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .close-button[aria-disabled="true"] { cursor: progress; opacity: .65; }
+
+@media (max-height: 420px) {
+  .entry-top .detail-header { padding-block: 14px; }
+}
 
 @media (max-width: 790px) {
   .shell { width: min(100% - 36px, 1200px); }
