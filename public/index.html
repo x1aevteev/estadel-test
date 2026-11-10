@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#f5f7fc">
+    <title>Мониторинг интеграций | ESTADEL</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" type="module"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-content">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h4l3-6 4 12 3-6h4"/>
+            </svg>
+          </span>
+          <span class="brand-name">ESTADEL</span>
+          <span class="brand-caption">Панель мониторинга</span>
+        </div>
+        <p class="sync-state" id="sync-state" data-state="loading">
+          <span class="sync-dot" aria-hidden="true"></span>
+          <span id="sync-label">Подключение</span>
+        </p>
+      </div>
+    </header>
+
+    <main class="shell main-content">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Операционный журнал</p>
+          <h1>Мониторинг интеграций</h1>
+          <p class="page-description">Отслеживайте вебхуки, их результаты и причины ошибок.</p>
+        </div>
+        <button class="button refresh-button" id="refresh" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 11a8 8 0 0 0-14-4L4 9m0 0h5M4 9V4m0 9a8 8 0 0 0 14 4l2-2m0 0h-5m5 0v5"/>
+          </svg>
+          Обновить
+        </button>
+      </div>
+
+      <section aria-label="Статистика событий">
+        <dl class="metrics">
+          <div class="metric">
+            <dt>
+              <span class="metric-icon metric-icon-total" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m12 3 9 5-9 5-9-5 9-5Zm9 9-9 5-9-5m18 4-9 5-9-5"/>
+                </svg>
+              </span>
+              Всего событий
+            </dt>
+            <dd id="count-total">—</dd>
+          </div>
+          <div class="metric">
+            <dt>
+              <span class="metric-icon metric-icon-success" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="8.5"/>
+                  <path d="m8.5 12 2.3 2.5 4.7-5"/>
+                </svg>
+              </span>
+              Успешно
+            </dt>
+            <dd id="count-success">—</dd>
+          </div>
+          <div class="metric">
+            <dt>
+              <span class="metric-icon metric-icon-error" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="8.5"/>
+                  <path d="M12 8v4.5m0 3h.01"/>
+                </svg>
+              </span>
+              С ошибкой
+            </dt>
+            <dd id="count-error">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="journal" aria-labelledby="journal-title">
+        <div class="journal-header">
+          <div>
+            <h2 id="journal-title">Журнал событий</h2>
+            <p class="journal-description">Сначала новые · Время МСК</p>
+          </div>
+          <div class="filters" role="group" aria-label="Фильтр по статусу">
+            <button type="button" data-filter="all" aria-pressed="true">Все</button>
+            <button type="button" data-filter="success" aria-pressed="false">Успешно</button>
+            <button type="button" data-filter="error" aria-pressed="false">Ошибка</button>
+          </div>
+        </div>
+
+        <div class="notice" id="notice" hidden>
+          <div role="alert" id="notice-text"></div>
+          <button class="button retry-button" id="retry" type="button">Повторить</button>
+        </div>
+
+        <div class="list-area" id="list-area" aria-busy="true">
+          <div class="list-state" id="list-state">
+            <div class="state-symbol" aria-hidden="true"><span class="state-loader"></span></div>
+            <p class="state-title" id="state-title">Загружаем события</p>
+            <p class="state-description" id="state-description">Получаем данные журнала.</p>
+          </div>
+
+          <table class="event-table" id="event-table" role="table" aria-labelledby="journal-title" hidden>
+            <colgroup>
+              <col class="time-column">
+              <col class="source-column">
+              <col class="type-column">
+              <col class="status-column">
+              <col>
+              <col class="action-column">
+            </colgroup>
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader">Время</th>
+                <th scope="col" role="columnheader">Источник</th>
+                <th scope="col" role="columnheader">Тип события</th>
+                <th scope="col" role="columnheader">Статус</th>
+                <th scope="col" role="columnheader">Описание</th>
+                <th scope="col" role="columnheader"><span class="sr-only">Детали</span></th>
+              </tr>
+            </thead>
+            <tbody id="event-rows" role="rowgroup"></tbody>
+          </table>
+        </div>
+
+        <div class="journal-footer" id="journal-footer" hidden>
+          <span id="visible-count"></span>
+          <span class="refresh-hint">Автообновление каждые 5 сек.</span>
+        </div>
+      </section>
+      <p class="sr-only" id="announcer" role="status"></p>
+    </main>
+
+    <template id="event-row">
+      <tr role="row">
+        <td role="cell"><time class="event-time"><span></span><span></span></time></td>
+        <td role="cell"><span class="source-badge"></span></td>
+        <td role="cell"><span class="event-type"></span></td>
+        <td role="cell"><span class="status-badge"></span></td>
+        <td role="cell" class="event-message"><span></span></td>
+        <td role="cell">
+          <button class="icon-button row-action" type="button" title="Открыть детали">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m10 6 6 6-6 6"/>
+            </svg>
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <dialog class="detail-drawer" id="detail-dialog" aria-labelledby="detail-title">
+      <div class="detail-header">
+        <div>
+          <p class="eyebrow">Запись журнала</p>
+          <h2 id="detail-title">Детали события</h2>
+        </div>
+        <form method="dialog">
+          <button class="icon-button close-button" type="submit" aria-label="Закрыть детали" autofocus>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+      <div class="detail-body">
+        <div class="detail-summary">
+          <p class="event-type" id="detail-type"></p>
+          <span class="status-badge" id="detail-status"></span>
+        </div>
+        <dl class="detail-fields">
+          <div>
+            <dt>Идентификатор</dt>
+            <dd class="mono" id="detail-id"></dd>
+          </div>
+          <div>
+            <dt>Источник</dt>
+            <dd id="detail-source"></dd>
+          </div>
+          <div>
+            <dt>Время события</dt>
+            <dd><time id="detail-time"></time></dd>
+          </div>
+        </dl>
+        <div class="detail-message" id="detail-message-card">
+          <h3 id="detail-message-title">Описание</h3>
+          <p id="detail-message"></p>
+        </div>
+      </div>
+    </dialog>
+  </body>
+</html>
