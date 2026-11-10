@@ -580,6 +580,14 @@ body:has(.detail-drawer[open]) { overflow: hidden; }
   .entry-top .detail-header { padding-block: 14px; }
 }
 
+@media (max-height: 360px) {
+  .entry-top .detail-header { padding-block: 6px; }
+  .entry-top .eyebrow { display: none; }
+  .entry-top .detail-header h2 { margin-top: 0; font-size: 1.1rem; line-height: 1.25; }
+  .entry-required-notice { margin-top: 6px; padding-block: 6px 9px; }
+  .entry-form { scroll-padding-block: 6px; }
+}
+
 @media (max-width: 790px) {
   .shell { width: min(100% - 36px, 1200px); }
   .main-content { padding-block: 31px 36px; }

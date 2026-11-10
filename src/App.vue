@@ -108,18 +108,23 @@ function toggleTimeOrder() {
   announcer.value = `${orderLabel.value} события.`;
 }
 
-async function includeCreatedEvent(created: IntegrationEvent) {
-  if (snapshot.value === null) await loadEvents();
-  const revealEvent = activeFilter.value !== "all" && activeFilter.value !== created.status;
-  if (revealEvent) activeFilter.value = "all";
-  if (snapshot.value === null) return revealEvent;
-
+function mergeCreatedEvent(created: IntegrationEvent) {
+  if (snapshot.value === null) return;
   journalRevision += 1;
   const events = [...snapshot.value];
   const existingIndex = events.findIndex((event) => event.id === created.id);
   if (existingIndex === -1) events.unshift(created);
   else events[existingIndex] = created;
   snapshot.value = events;
+}
+
+function includeCreatedEvent(created: IntegrationEvent) {
+  const revealEvent = activeFilter.value !== "all" && activeFilter.value !== created.status;
+  if (revealEvent) activeFilter.value = "all";
+
+  // Wait for the first complete snapshot in the background, so its counters stay accurate.
+  if (snapshot.value === null) void loadEvents().then(() => mergeCreatedEvent(created));
+  else mergeCreatedEvent(created);
   return revealEvent;
 }
 

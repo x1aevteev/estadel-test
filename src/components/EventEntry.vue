@@ -6,7 +6,7 @@ type EventField = keyof EventDraft;
 type FieldErrors = Partial<Record<EventField, string>>;
 
 const props = defineProps<{
-  includeEvent: (event: IntegrationEvent) => Promise<boolean>;
+  includeEvent: (event: IntegrationEvent) => boolean;
 }>();
 
 const emit = defineEmits<{
@@ -23,6 +23,11 @@ const pending = ref(false);
 const errorMessage = ref("");
 const fieldErrors = ref<FieldErrors>({});
 const isError = computed(() => draft.status === "error");
+const missingMessage = computed(() => isError.value ? "Укажите причину ошибки." : "Добавьте описание.");
+const messageError = computed(() => {
+  const error = fieldErrors.value.message;
+  return error && !draft.message.trim() ? missingMessage.value : error;
+});
 const requiredNoticeDuration = 5_000;
 const requiredNotice = ref<number | null>(null);
 let noticeSequence = 0;
@@ -49,8 +54,11 @@ async function focusField(field: EventField) {
   control.focus({ preventScroll: true });
   const fieldBounds = (control.closest(".entry-field") ?? control).getBoundingClientRect();
   const formBounds = scrollArea.getBoundingClientRect();
-  const topOffset = fieldBounds.top - formBounds.top - 12;
-  const bottomOffset = fieldBounds.bottom - formBounds.bottom + 12;
+  const preferredPadding = Number.parseFloat(getComputedStyle(scrollArea).scrollPaddingBlockStart) || 0;
+  const availablePadding = Math.max(0, (formBounds.height - fieldBounds.height) / 2);
+  const padding = Math.min(preferredPadding, availablePadding);
+  const topOffset = fieldBounds.top - formBounds.top - padding;
+  const bottomOffset = fieldBounds.bottom - formBounds.bottom + padding;
   if (topOffset < 0) scrollArea.scrollTop += topOffset;
   else if (bottomOffset > 0) scrollArea.scrollTop += Math.min(topOffset, bottomOffset);
 }
@@ -95,7 +103,7 @@ async function submit() {
     source: "Укажите источник.",
     type: "Укажите тип события.",
     status: "Выберите статус.",
-    message: isError.value ? "Укажите причину ошибки." : "Добавьте описание.",
+    message: missingMessage.value,
   };
   for (const field of eventFields) {
     if (draft[field].trim()) continue;
@@ -136,7 +144,7 @@ async function submit() {
     }
     if (response.status !== 201 || !isEvent(result)) throw new Error("Invalid event response");
 
-    const switchedFilter = await props.includeEvent(result);
+    const switchedFilter = props.includeEvent(result);
     drawer.value?.close();
     emit("saved", switchedFilter);
   } catch {
@@ -262,10 +270,10 @@ defineExpose({ open });
               required
               maxlength="500"
               aria-describedby="message-error"
-              :aria-invalid="fieldErrors.message ? true : undefined"
+              :aria-invalid="messageError ? true : undefined"
               @input="clearCorrectedField('message', $event)"
             ></textarea>
-            <p class="entry-field-error" id="message-error" :hidden="!fieldErrors.message">{{ fieldErrors.message }}</p>
+            <p class="entry-field-error" id="message-error" :hidden="!messageError">{{ messageError }}</p>
           </div>
         </fieldset>
         <div role="alert"><p class="entry-error" id="add-event-error" :hidden="!errorMessage">{{ errorMessage }}</p></div>
