@@ -35,13 +35,23 @@
           <h1>Мониторинг интеграций</h1>
           <p class="page-description">Отслеживайте вебхуки, их результаты и причины ошибок.</p>
         </div>
-        <button class="button refresh-button" id="refresh" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 11a8 8 0 0 0-14-4L4 9m0 0h5M4 9V4m0 9a8 8 0 0 0 14 4l2-2m0 0h-5m5 0v5"/>
-          </svg>
-          Обновить
-        </button>
+        <div class="heading-actions">
+          <button class="button primary-button" id="add-event" type="button" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Добавить тестовое событие
+          </button>
+          <button class="button refresh-button" id="refresh" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 11a8 8 0 0 0-14-4L4 9m0 0h5M4 9V4m0 9a8 8 0 0 0 14 4l2-2m0 0h-5m5 0v5"/>
+            </svg>
+            Обновить
+          </button>
+        </div>
       </div>
+
+      <div role="status"><p class="creation-success" id="creation-success" hidden></p></div>
 
       <section aria-label="Статистика событий">
         <dl class="metrics">
@@ -171,6 +181,54 @@
         </td>
       </tr>
     </template>
+
+    <dialog class="detail-drawer" id="add-event-dialog" aria-labelledby="add-event-title" aria-describedby="add-event-hint">
+      <div class="detail-header">
+        <div>
+          <p class="eyebrow">Новая запись</p>
+          <h2 id="add-event-title">Добавить тестовое событие</h2>
+        </div>
+        <button class="icon-button close-button" id="close-add-event" type="button" aria-label="Закрыть форму">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"/>
+          </svg>
+        </button>
+      </div>
+      <form class="entry-form" id="add-event-form">
+        <p class="entry-hint" id="add-event-hint">Используйте вымышленные данные. Все поля обязательны.</p>
+        <fieldset class="entry-fields" id="entry-fields">
+          <div class="entry-field">
+            <label for="event-source">Источник</label>
+            <input id="event-source" name="source" placeholder="Например, amoCRM" required maxlength="80" autofocus aria-describedby="source-error">
+            <p class="entry-field-error" id="source-error" hidden></p>
+          </div>
+          <div class="entry-field">
+            <label for="event-type">Тип события</label>
+            <input id="event-type" name="type" placeholder="Например, lead.created" required maxlength="80" aria-describedby="type-error">
+            <p class="entry-field-error" id="type-error" hidden></p>
+          </div>
+          <div class="entry-field">
+            <label for="event-status">Статус</label>
+            <select id="event-status" name="status" required aria-describedby="status-error">
+              <option value="success">Успешно</option>
+              <option value="error">Ошибка</option>
+            </select>
+            <p class="entry-field-error" id="status-error" hidden></p>
+          </div>
+          <div class="entry-field">
+            <label for="event-message" id="event-message-label">Описание</label>
+            <textarea id="event-message" name="message" rows="3" placeholder="Например, тестовая заявка принята" required maxlength="500" aria-describedby="message-error"></textarea>
+            <p class="entry-field-error" id="message-error" hidden></p>
+          </div>
+        </fieldset>
+        <div role="alert"><p class="entry-error" id="add-event-error" hidden></p></div>
+        <p class="sr-only" id="add-event-progress" role="status"></p>
+        <div class="entry-actions">
+          <button class="button" id="cancel-add-event" type="button">Отмена</button>
+          <button class="button primary-button" id="submit-event" type="submit">Добавить событие</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="detail-drawer" id="detail-dialog" aria-labelledby="detail-title">
       <div class="detail-header">

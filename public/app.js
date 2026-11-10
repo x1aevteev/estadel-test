@@ -23,13 +23,24 @@ const notice = byId("notice");
 const noticeText = byId("notice-text");
 const announcer = byId("announcer");
 const dialog = byId("detail-dialog");
+const addEventButton = byId("add-event");
+const entryDialog = byId("add-event-dialog");
+const entryForm = byId("add-event-form");
+const entryClose = byId("close-add-event");
+const entryCancel = byId("cancel-add-event");
+const entrySubmit = byId("submit-event");
+const entryError = byId("add-event-error");
+const creationSuccess = byId("creation-success");
+const entryFields = ["source", "type", "status", "message"];
 
 let events = null;
 let activeFilter = "all";
 let timeOrder = "descending";
 let pendingRequest = null;
+let journalRevision = 0;
 let manualRefreshPending = false;
 let detailOpener = null;
+let entryPending = false;
 
 function showListState(title, description) {
   listState.querySelector(".state-loader")?.remove();
@@ -93,6 +104,13 @@ function renderJournal() {
   byId("journal-footer").hidden = false;
 }
 
+function setActiveFilter(status) {
+  activeFilter = status;
+  for (const filter of filters) {
+    filter.setAttribute("aria-pressed", String(filter.dataset.filter === status));
+  }
+}
+
 function toggleTimeOrder() {
   timeOrder = timeOrder === "descending" ? "ascending" : "descending";
   const label = timeOrder === "ascending" ? "Сначала старые" : "Сначала новые";
@@ -137,6 +155,7 @@ function showRequestError() {
 }
 
 async function requestEvents() {
+  const revision = journalRevision;
   let nextEvents;
   try {
     const response = await fetch("/api/events", {
@@ -149,10 +168,12 @@ async function requestEvents() {
       throw new Error("Invalid events response");
     }
   } catch {
-    showRequestError();
+    if (revision === journalRevision) showRequestError();
     return false;
   }
 
+  // A GET started before a successful POST must not replace its local result.
+  if (revision !== journalRevision) return false;
   const changed = JSON.stringify(events) !== JSON.stringify(nextEvents);
   events = nextEvents;
   if (changed) {
@@ -199,6 +220,98 @@ function pollEvents() {
   if (document.visibilityState === "visible") void loadEvents();
 }
 
+function updateMessageLabel() {
+  const isError = byId("event-status").value === "error";
+  byId("event-message-label").textContent = isError ? "Причина ошибки" : "Описание";
+  byId("event-message").placeholder = isError
+    ? "Например, отсутствует номер заказа"
+    : "Например, тестовая заявка принята";
+}
+
+function setFieldError(field, message) {
+  const control = entryForm.elements.namedItem(field);
+  const error = byId(`${field}-error`);
+  error.textContent = message;
+  error.hidden = !message;
+  if (message) control.setAttribute("aria-invalid", "true");
+  else control.removeAttribute("aria-invalid");
+  return control;
+}
+
+function showEntryError(message, fields) {
+  entryError.hidden = !message;
+  entryError.textContent = message;
+  let firstInvalid;
+  for (const field of entryFields) {
+    const detail = typeof fields?.[field] === "string" ? fields[field] : "";
+    const control = setFieldError(field, detail);
+    if (detail) firstInvalid ??= control;
+  }
+  return firstInvalid;
+}
+
+function setEntryPending(pending) {
+  entryPending = pending;
+  byId("entry-fields").disabled = pending;
+  entrySubmit.textContent = pending ? "Добавляем…" : "Добавить событие";
+  for (const button of [entrySubmit, entryClose, entryCancel]) {
+    if (pending) button.setAttribute("aria-disabled", "true");
+    else button.removeAttribute("aria-disabled");
+  }
+  byId("add-event-progress").textContent = pending ? "Добавляем событие." : "";
+  if (pending) entrySubmit.focus();
+}
+
+async function includeCreatedEvent(created) {
+  if (events === null) await loadEvents();
+  const revealEvent = activeFilter !== "all" && activeFilter !== created.status;
+  if (revealEvent) setActiveFilter("all");
+  if (events === null) return revealEvent;
+
+  journalRevision += 1;
+  if (!events.some((event) => event.id === created.id)) events = [created, ...events];
+  updateMetrics();
+  renderJournal();
+  return revealEvent;
+}
+
+async function submitEvent(submission) {
+  submission.preventDefault();
+  if (entryPending) return;
+  const payload = Object.fromEntries(new FormData(entryForm));
+  showEntryError("");
+  setEntryPending(true);
+  let invalidField;
+  try {
+    const response = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8_000),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = result?.error;
+      const message = typeof error?.message === "string" ? error.message : "Не удалось добавить событие.";
+      invalidField = showEntryError(message, error?.fields);
+      return;
+    }
+    if (response.status !== 201 || !isEvent(result)) throw new Error("Invalid event response");
+
+    const switchedFilter = await includeCreatedEvent(result);
+    entryDialog.close();
+    creationSuccess.hidden = false;
+    creationSuccess.textContent = switchedFilter
+      ? "Событие добавлено. Фильтр переключён на «Все»."
+      : "Событие добавлено.";
+  } catch {
+    showEntryError("Не удалось подтвердить сохранение. Проверьте журнал перед повторной отправкой.");
+  } finally {
+    setEntryPending(false);
+    invalidField?.focus();
+  }
+}
+
 function showDetails(event, opener) {
   detailOpener = opener;
   byId("detail-type").textContent = event.type;
@@ -218,16 +331,37 @@ function showDetails(event, opener) {
 for (const button of filters) {
   button.addEventListener("click", () => {
     if (activeFilter === button.dataset.filter) return;
-    activeFilter = button.dataset.filter;
-    for (const filter of filters) {
-      filter.setAttribute("aria-pressed", String(filter === button));
-    }
+    setActiveFilter(button.dataset.filter);
     if (events !== null) {
       renderJournal();
       announcer.textContent = `${byId("visible-count").textContent}.`;
     }
   });
 }
+
+addEventButton.addEventListener("click", () => {
+  entryForm.reset();
+  updateMessageLabel();
+  showEntryError("");
+  creationSuccess.hidden = true;
+  creationSuccess.textContent = "";
+  entryDialog.showModal();
+});
+entryForm.addEventListener("submit", submitEvent);
+entryForm.addEventListener("input", (event) => {
+  const field = event.target.name;
+  if (entryFields.includes(field)) setFieldError(field, "");
+  if (field === "status") updateMessageLabel();
+});
+for (const button of [entryClose, entryCancel]) {
+  button.addEventListener("click", () => {
+    if (!entryPending) entryDialog.close();
+  });
+}
+entryDialog.addEventListener("cancel", (event) => {
+  if (entryPending) event.preventDefault();
+});
+entryDialog.addEventListener("close", () => addEventButton.focus());
 
 rows.addEventListener("click", (click) => {
   const row = click.target.closest("tr[data-event-id]");
